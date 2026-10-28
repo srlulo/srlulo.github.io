@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Control Diario Uber Moto · Vento Alpina 300</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
@@ -13,287 +14,303 @@
 </head>
 <body class="min-h-screen pb-12">
 
-  <!-- Encabezado -->
   <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-20 px-4 py-3">
-    <div class="max-w-3xl mx-auto flex items-center justify-between">
+    <div class="max-w-3xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
         <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Vento Alpina 300 · Bogotá</span>
         <h1 class="text-lg font-bold text-white">Tablero de Control Diario</h1>
       </div>
-      <button onclick="toggleConfig()" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700">
-        ⚙️ Ajustar Parámetros
-      </button>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button id="syncButton" onclick="openAuthModal()" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700">
+          <span id="syncDot">🟠</span> <span id="syncStatus">Solo este dispositivo</span>
+        </button>
+        <button id="logoutButton" onclick="signOut()" class="hidden px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700">Salir</button>
+        <button onclick="toggleConfig()" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700">⚙️ Ajustar Parámetros</button>
+      </div>
+    </div>
+    <div id="accountBar" class="hidden max-w-3xl mx-auto mt-2 text-[11px] text-slate-400">
+      Sincronizado como <span id="accountEmail" class="text-emerald-300 font-medium"></span>
     </div>
   </header>
 
   <main class="max-w-3xl mx-auto px-4 mt-6 space-y-6">
 
-    <!-- Panel de Configuración (Oculto por defecto) -->
     <section id="configPanel" class="hidden bg-slate-800/90 border border-slate-700 rounded-2xl p-4 space-y-4">
       <div class="flex justify-between items-center border-b border-slate-700 pb-2">
         <h2 class="text-sm font-semibold text-white">Parámetros Base (Vento Alpina 300)</h2>
         <button onclick="toggleConfig()" class="text-xs text-slate-400 hover:text-white">Cerrar ✕</button>
       </div>
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-        <div>
-          <label class="block text-slate-400 mb-1">Meta Diaria Libre (COP)</label>
-          <input id="cfgGoal" type="number" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white" />
-        </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Precio Galón Gasolina</label>
-          <input id="cfgGasPrice" type="number" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white" />
-        </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Rendimiento (km / Litro)</label>
-          <input id="cfgKmPerLiter" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white" />
-        </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Reserva Desgaste (COP/km)</label>
-          <input id="cfgMaintKm" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white" />
-        </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Gastos Fijos Día (Datos/Agua)</label>
-          <input id="cfgFixedCost" type="number" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white" />
-        </div>
-        <div>
-          <label class="block text-slate-400 mb-1">Criterio de Meta</label>
-          <select id="cfgMode" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white">
-            <option value="real">Utilidad Neta Real (Recomendado)</option>
-            <option value="cash">Flujo de Caja (Bolsillo)</option>
-          </select>
-        </div>
+        <div><label class="block text-slate-400 mb-1">Meta Diaria Libre (COP)</label><input id="cfgGoal" type="number" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white" /></div>
+        <div><label class="block text-slate-400 mb-1">Precio Galón Gasolina</label><input id="cfgGasPrice" type="number" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white" /></div>
+        <div><label class="block text-slate-400 mb-1">Rendimiento (km / Litro)</label><input id="cfgKmPerLiter" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white" /></div>
+        <div><label class="block text-slate-400 mb-1">Reserva Desgaste (COP/km)</label><input id="cfgMaintKm" type="number" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white" /></div>
+        <div><label class="block text-slate-400 mb-1">Gastos Fijos Día (Datos/Agua)</label><input id="cfgFixedCost" type="number" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white" /></div>
+        <div><label class="block text-slate-400 mb-1">Criterio de Meta</label><select id="cfgMode" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"><option value="real">Utilidad Neta Real (Recomendado)</option><option value="cash">Flujo de Caja (Bolsillo)</option></select></div>
       </div>
-      <div class="flex justify-end">
-        <button onclick="saveConfig()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg">
-          Guardar Cambios
-        </button>
-      </div>
+      <div class="flex justify-end"><button onclick="saveConfig()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg">Guardar Cambios</button></div>
     </section>
 
-    <!-- Medidor Principal de Ingresos y Meta -->
     <section class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5">
       <div class="flex flex-col sm:flex-row items-center gap-6">
-        <!-- Medidor Circular SVG -->
         <div class="relative w-36 h-36 flex items-center justify-center shrink-0">
           <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
             <circle cx="60" cy="60" r="50" stroke="#1e293b" stroke-width="10" fill="transparent" />
             <circle id="gaugeBar" class="gauge-ring" cx="60" cy="60" r="50" stroke="#10b981" stroke-width="10" stroke-linecap="round" fill="transparent" stroke-dasharray="314.16" stroke-dashoffset="314.16" />
           </svg>
-          <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span id="gaugePct" class="text-2xl font-bold text-white">0%</span>
-            <span class="text-[11px] text-slate-400">de la meta</span>
-          </div>
+          <div class="absolute inset-0 flex flex-col items-center justify-center text-center"><span id="gaugePct" class="text-2xl font-bold text-white">0%</span><span class="text-[11px] text-slate-400">de la meta</span></div>
         </div>
-
-        <!-- Detalles del Progreso -->
         <div class="flex-1 w-full space-y-3">
           <div class="flex justify-between items-baseline">
-            <div>
-              <p id="modeLabel" class="text-xs font-medium text-emerald-400 uppercase">Utilidad Neta Real Acumulada</p>
-              <h2 id="currentNetDisplay" class="text-3xl font-bold text-white">$0 COP</h2>
-            </div>
-            <div class="text-right">
-              <p class="text-xs text-slate-400">Meta Diaria</p>
-              <p id="goalDisplay" class="text-sm font-semibold text-slate-200">$100.000 COP</p>
-            </div>
+            <div><p id="modeLabel" class="text-xs font-medium text-emerald-400 uppercase">Utilidad Neta Real Acumulada</p><h2 id="currentNetDisplay" class="text-3xl font-bold text-white">$0 COP</h2></div>
+            <div class="text-right"><p class="text-xs text-slate-400">Meta Diaria</p><p id="goalDisplay" class="text-sm font-semibold text-slate-200">$100.000 COP</p></div>
           </div>
-
-          <!-- Barra lineal secundaria -->
-          <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden">
-            <div id="linearProgressBar" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%"></div>
-          </div>
-
-          <div class="flex justify-between text-xs text-slate-300 pt-1">
-            <span id="remainingText">Faltan: <b class="text-white">$100.000 COP</b></span>
-            <span id="estTripsLeft">~25 viajes restantes</span>
-          </div>
+          <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden"><div id="linearProgressBar" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%"></div></div>
+          <div class="flex justify-between text-xs text-slate-300 pt-1"><span id="remainingText">Faltan: <b class="text-white">$100.000 COP</b></span><span id="estTripsLeft">~25 viajes restantes</span></div>
         </div>
       </div>
-
-      <!-- Tarjetas KPI Rápidas -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-700/70">
-        <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-800">
-          <span class="text-[11px] text-slate-400 block">Distancia Total Hoy</span>
-          <span id="kpiDistance" class="text-base font-bold text-white">0,0 km</span>
-          <span id="kpiTripsCount" class="text-[11px] text-slate-400 block">0 viajes realizados</span>
-        </div>
-        <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-800">
-          <span class="text-[11px] text-slate-400 block">Efectivo en Bolsillo</span>
-          <span id="kpiCashInHand" class="text-base font-bold text-cyan-400">$0</span>
-          <span class="text-[11px] text-slate-400 block">Descontando gasolina</span>
-        </div>
-        <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-800">
-          <span class="text-[11px] text-slate-400 block">Gasto Gasolina Hoy</span>
-          <span id="kpiFuelCost" class="text-base font-bold text-amber-400">$0</span>
-          <span id="kpiFuelKmCost" class="text-[11px] text-slate-400 block">$160 COP/km</span>
-        </div>
-        <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-800">
-          <span class="text-[11px] text-slate-400 block">Reserva Desgaste/SOAT</span>
-          <span id="kpiMaintCost" class="text-base font-bold text-purple-400">$0</span>
-          <span id="kpiMaintKmCost" class="text-[11px] text-slate-400 block">$137 COP/km</span>
-        </div>
+        <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-800"><span class="text-[11px] text-slate-400 block">Distancia Total Hoy</span><span id="kpiDistance" class="text-base font-bold text-white">0,0 km</span><span id="kpiTripsCount" class="text-[11px] text-slate-400 block">0 viajes realizados</span></div>
+        <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-800"><span class="text-[11px] text-slate-400 block">Efectivo en Bolsillo</span><span id="kpiCashInHand" class="text-base font-bold text-cyan-400">$0</span><span class="text-[11px] text-slate-400 block">Descontando gasolina</span></div>
+        <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-800"><span class="text-[11px] text-slate-400 block">Gasto Gasolina Hoy</span><span id="kpiFuelCost" class="text-base font-bold text-amber-400">$0</span><span id="kpiFuelKmCost" class="text-[11px] text-slate-400 block">$160 COP/km</span></div>
+        <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-800"><span class="text-[11px] text-slate-400 block">Reserva Desgaste/SOAT</span><span id="kpiMaintCost" class="text-base font-bold text-purple-400">$0</span><span id="kpiMaintKmCost" class="text-[11px] text-slate-400 block">$137 COP/km</span></div>
       </div>
     </section>
 
-    <!-- Formulario para Registrar o Corregir Viaje -->
     <section class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5">
-      <div class="flex items-center justify-between mb-4">
-        <h3 id="formTitle" class="text-sm font-bold text-white">➕ Registrar Nuevo Viaje o Bono</h3>
-        <span id="editBadge" class="hidden px-2 py-0.5 text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded">
-          Modo Corrección Activo
-        </span>
-      </div>
-
+      <div class="flex items-center justify-between mb-4"><h3 id="formTitle" class="text-sm font-bold text-white">➕ Registrar Nuevo Viaje o Bono</h3><span id="editBadge" class="hidden px-2 py-0.5 text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded">Modo Corrección Activo</span></div>
       <form id="tripForm" onsubmit="handleTripSubmit(event)" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <input type="hidden" id="editTripId" value="" />
-        
-        <div>
-          <label class="block text-xs text-slate-300 mb-1">Valor Recibido Neto ($ COP)*</label>
-          <input id="inputNetFare" type="number" required min="0" placeholder="Ej: 6375" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none" />
-          <span class="text-[10px] text-slate-400">Lo que te paga la app en el viaje</span>
-        </div>
-
-        <div>
-          <label class="block text-xs text-slate-300 mb-1">Distancia Carrera (km)*</label>
-          <input id="inputTripKm" type="number" step="0.1" required min="0" placeholder="Ej: 6.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none" />
-          <span class="text-[10px] text-slate-400">Pon 0 si es un bono extra</span>
-        </div>
-
-        <div>
-          <label class="block text-xs text-slate-300 mb-1">Km Recogida / Vacío</label>
-          <input id="inputDeadheadKm" type="number" step="0.1" min="0" value="1.8" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none" />
-          <span class="text-[10px] text-slate-400">Promedio Bogotá: 1.8 km</span>
-        </div>
-
-        <div>
-          <label class="block text-xs text-slate-300 mb-1">Nota / Zona (Opcional)</label>
-          <input id="inputNote" type="text" placeholder="Ej: Chapinero / Bono" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none" />
-          <span class="text-[10px] text-slate-400">Para identificar el viaje</span>
-        </div>
-
-        <div class="sm:col-span-4 flex justify-end gap-2 pt-2">
-          <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-semibold text-slate-200">
-            Cancelar Corrección
-          </button>
-          <button type="submit" id="submitBtn" class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30">
-            Guardar Registro
-          </button>
-        </div>
+        <div><label class="block text-xs text-slate-300 mb-1">Valor Recibido Neto ($ COP)*</label><input id="inputNetFare" type="number" required min="0" placeholder="Ej: 6375" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none" /><span class="text-[10px] text-slate-400">Lo que te paga la app en el viaje</span></div>
+        <div><label class="block text-xs text-slate-300 mb-1">Distancia Carrera (km)*</label><input id="inputTripKm" type="number" step="0.1" required min="0" placeholder="Ej: 6.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none" /><span class="text-[10px] text-slate-400">Pon 0 si es un bono extra</span></div>
+        <div><label class="block text-xs text-slate-300 mb-1">Km Recogida / Vacío</label><input id="inputDeadheadKm" type="number" step="0.1" min="0" value="1.8" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none" /><span class="text-[10px] text-slate-400">Promedio Bogotá: 1.8 km</span></div>
+        <div><label class="block text-xs text-slate-300 mb-1">Nota / Zona (Opcional)</label><input id="inputNote" type="text" placeholder="Ej: Chapinero / Bono" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none" /><span class="text-[10px] text-slate-400">Para identificar el viaje</span></div>
+        <div class="sm:col-span-4 flex justify-end gap-2 pt-2"><button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-semibold text-slate-200">Cancelar Corrección</button><button type="submit" id="submitBtn" class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30">Guardar Registro</button></div>
       </form>
     </section>
 
-    <!-- Lista de Viajes del Día (Con opción de Corregir y Eliminar) -->
     <section class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div>
-          <h3 class="text-sm font-bold text-white">📋 Historial de Viajes del Turno Actual</h3>
-          <p class="text-xs text-slate-400">Si te equivocaste en algún dato, pulsa "Corregir" en la fila correspondiente.</p>
-        </div>
-        <button onclick="openEndDayModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow">
-          🏁 Terminar el Día y Hacer Corte
-        </button>
+        <div><h3 class="text-sm font-bold text-white">📋 Historial de Viajes del Turno Actual</h3><p class="text-xs text-slate-400">Si te equivocaste en algún dato, pulsa "Corregir" en la fila correspondiente.</p></div>
+        <button onclick="openEndDayModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow">🏁 Terminar el Día y Hacer Corte</button>
       </div>
-
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr class="border-b border-slate-700 text-slate-400">
-              <th class="py-2.5 px-2">#</th>
-              <th class="py-2.5 px-2">Detalle</th>
-              <th class="py-2.5 px-2">Km Totales</th>
-              <th class="py-2.5 px-2">Recibido App</th>
-              <th class="py-2.5 px-2">Gasolina</th>
-              <th class="py-2.5 px-2">Utilidad Real</th>
-              <th class="py-2.5 px-2 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tripsTableBody" class="divide-y divide-slate-800 text-slate-200">
-            <!-- Filas dinámicas -->
-          </tbody>
-        </table>
+        <table class="w-full text-left border-collapse text-xs"><thead><tr class="border-b border-slate-700 text-slate-400"><th class="py-2.5 px-2">#</th><th class="py-2.5 px-2">Detalle</th><th class="py-2.5 px-2">Km Totales</th><th class="py-2.5 px-2">Recibido App</th><th class="py-2.5 px-2">Gasolina</th><th class="py-2.5 px-2">Utilidad Real</th><th class="py-2.5 px-2 text-right">Acciones</th></tr></thead><tbody id="tripsTableBody" class="divide-y divide-slate-800 text-slate-200"></tbody></table>
       </div>
     </section>
 
-    <!-- Historial de Días Cerrados -->
     <section class="bg-slate-800/40 border border-slate-800 rounded-2xl p-5 space-y-3">
-      <div class="flex justify-between items-center">
-        <h3 class="text-sm font-bold text-slate-300">🗂️ Cierres de Días Anteriores</h3>
-        <button onclick="clearHistory()" class="text-[11px] text-slate-400 hover:text-red-400">Limpiar historial</button>
-      </div>
-      <div id="daysHistoryContainer" class="space-y-2 text-xs text-slate-400">
-        <!-- Días cerrados -->
-      </div>
+      <div class="flex justify-between items-center"><h3 class="text-sm font-bold text-slate-300">🗂️ Cierres de Días Anteriores</h3><button onclick="clearHistory()" class="text-[11px] text-slate-400 hover:text-red-400">Limpiar historial</button></div>
+      <div id="daysHistoryContainer" class="space-y-2 text-xs text-slate-400"></div>
     </section>
-
   </main>
 
-  <!-- Modal de Cierre del Día (3 Fondos Contables) -->
   <div id="endDayModal" class="fixed inset-0 bg-black/75 hidden items-center justify-center p-4 z-50">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 space-y-4">
       <h3 class="text-lg font-bold text-white">🏁 Resumen y Cierre de Jornada</h3>
-      <p class="text-xs text-slate-300">
-        Para no descapitalizar tu <b>Vento Alpina 300</b>, distribuye el dinero recibido hoy en los siguientes 3 bolsillos antes de gastar tu ganancia:
-      </p>
-
+      <p class="text-xs text-slate-300">Para no descapitalizar tu <b>Vento Alpina 300</b>, distribuye el dinero recibido hoy en los siguientes 3 bolsillos antes de gastar tu ganancia:</p>
       <div class="space-y-2.5 text-xs">
-        <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex justify-between items-center">
-          <div>
-            <span class="font-semibold text-amber-300 block">1. Fondo de Gasolina (Tanqueo)</span>
-            <span class="text-[11px] text-slate-400">Para dejar el tanque lleno mañana</span>
-          </div>
-          <span id="modalFuel" class="text-base font-bold text-amber-300">$0</span>
-        </div>
-
-        <div class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 flex justify-between items-center">
-          <div>
-            <span class="font-semibold text-purple-300 block">2. Reserva Técnica + SOAT</span>
-            <span class="text-[11px] text-slate-400">Guardar en bolsillo/cuenta intocable</span>
-          </div>
-          <span id="modalMaint" class="text-base font-bold text-purple-300">$0</span>
-        </div>
-
-        <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex justify-between items-center">
-          <div>
-            <span class="font-semibold text-emerald-300 block">3. Tu Ganancia Neta Libre</span>
-            <span class="text-[11px] text-slate-400">Libre tras gastos fijos ($3.000)</span>
-          </div>
-          <span id="modalNet" class="text-base font-bold text-emerald-400">$0</span>
-        </div>
+        <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex justify-between items-center"><div><span class="font-semibold text-amber-300 block">1. Fondo de Gasolina (Tanqueo)</span><span class="text-[11px] text-slate-400">Para dejar el tanque lleno mañana</span></div><span id="modalFuel" class="text-base font-bold text-amber-300">$0</span></div>
+        <div class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 flex justify-between items-center"><div><span class="font-semibold text-purple-300 block">2. Reserva Técnica + SOAT</span><span class="text-[11px] text-slate-400">Guardar en bolsillo/cuenta intocable</span></div><span id="modalMaint" class="text-base font-bold text-purple-300">$0</span></div>
+        <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex justify-between items-center"><div><span class="font-semibold text-emerald-300 block">3. Tu Ganancia Neta Libre</span><span class="text-[11px] text-slate-400">Libre tras gastos fijos</span></div><span id="modalNet" class="text-base font-bold text-emerald-400">$0</span></div>
       </div>
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-800"><button onclick="closeEndDayModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">Seguir Trabajando</button><button onclick="confirmEndDay()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white">Guardar Día y Reiniciar Turno</button></div>
+    </div>
+  </div>
 
-      <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
-        <button onclick="closeEndDayModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">
-          Seguir Trabajando
-        </button>
-        <button onclick="confirmEndDay()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white">
-          Guardar Día y Reiniciar Turno
-        </button>
+  <div id="authModal" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-[60]">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-start"><div><h3 class="text-lg font-bold text-white">☁️ Sincronizar dispositivos</h3><p class="text-xs text-slate-400 mt-1">Usa la misma cuenta en tu celular, PC o tablet.</p></div><button onclick="closeAuthModal()" class="text-slate-400 hover:text-white">✕</button></div>
+      <div id="authMessage" class="hidden text-xs rounded-lg p-3"></div>
+      <div class="space-y-3">
+        <div><label class="block text-xs text-slate-300 mb-1">Correo</label><input id="authEmail" type="email" autocomplete="email" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none" placeholder="tu@correo.com" /></div>
+        <div><label class="block text-xs text-slate-300 mb-1">Contraseña</label><input id="authPassword" type="password" autocomplete="current-password" minlength="6" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none" placeholder="Mínimo 6 caracteres" /></div>
       </div>
+      <button id="loginBtn" onclick="signIn()" class="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl">Entrar y sincronizar</button>
+      <button id="signupBtn" onclick="signUp()" class="w-full px-4 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold rounded-xl">Crear cuenta</button>
+      <p class="text-[11px] text-slate-500 text-center">Tus datos siguen guardados localmente como respaldo incluso si no hay internet.</p>
     </div>
   </div>
 
   <script>
-    // Configuración por defecto calibrada para Vento Alpina 300 en Bogotá
+    const SUPABASE_URL = 'https://pisnflcpbunwhvuhbuxh.supabase.co';
+    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_zUi23dt8eXj3O46NIh0uPw_QuT41G81';
+    const cloud = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+
     const defaultConfig = {
       dailyGoal: 100000,
       gasPriceGal: 16350,
       kmPerLiter: 27.0,
       maintPerKm: 136.91,
       fixedDailyCost: 3000,
-      goalMode: 'real' // 'real' o 'cash'
+      goalMode: 'real'
     };
 
-    let config = JSON.parse(localStorage.getItem('alpina_config')) || defaultConfig;
+    let config = JSON.parse(localStorage.getItem('alpina_config')) || { ...defaultConfig };
     let trips = JSON.parse(localStorage.getItem('alpina_trips')) || [];
     let daysHistory = JSON.parse(localStorage.getItem('alpina_history')) || [];
+    let currentUser = null;
+    let syncBusy = false;
 
-    function formatCOP(val) {
-      return '$' + Math.round(val).toLocaleString('es-CO');
+    function persistLocal() {
+      localStorage.setItem('alpina_config', JSON.stringify(config));
+      localStorage.setItem('alpina_trips', JSON.stringify(trips));
+      localStorage.setItem('alpina_history', JSON.stringify(daysHistory));
     }
 
-    function getFuelCostPerKm() {
-      const kmPerGal = config.kmPerLiter * 3.78541;
-      return config.gasPriceGal / kmPerGal;
+    function setSyncStatus(state, text) {
+      const dot = document.getElementById('syncDot');
+      const label = document.getElementById('syncStatus');
+      const map = { local: '🟠', syncing: '🟡', synced: '🟢', error: '🔴' };
+      dot.textContent = map[state] || '⚪';
+      label.textContent = text;
+    }
+
+    function updateAccountUI() {
+      const accountBar = document.getElementById('accountBar');
+      const logoutButton = document.getElementById('logoutButton');
+      if (currentUser) {
+        accountBar.classList.remove('hidden');
+        logoutButton.classList.remove('hidden');
+        document.getElementById('accountEmail').textContent = currentUser.email || 'Cuenta activa';
+        document.getElementById('syncButton').onclick = syncFromCloud;
+      } else {
+        accountBar.classList.add('hidden');
+        logoutButton.classList.add('hidden');
+        document.getElementById('syncButton').onclick = openAuthModal;
+        setSyncStatus('local', 'Solo este dispositivo');
+      }
+    }
+
+    async function syncToCloud() {
+      persistLocal();
+      if (!currentUser || syncBusy) return;
+      syncBusy = true;
+      setSyncStatus('syncing', 'Sincronizando...');
+      const { error } = await cloud.from('app_state').upsert({
+        user_id: currentUser.id,
+        config,
+        trips,
+        days_history: daysHistory,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+      syncBusy = false;
+      if (error) {
+        console.error('Error sincronizando:', error);
+        setSyncStatus('error', 'Error de sincronización');
+      } else {
+        setSyncStatus('synced', 'Sincronizado');
+      }
+    }
+
+    async function syncFromCloud() {
+      if (!currentUser || syncBusy) return;
+      syncBusy = true;
+      setSyncStatus('syncing', 'Actualizando...');
+      const { data, error } = await cloud.from('app_state')
+        .select('config,trips,days_history,updated_at')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+      syncBusy = false;
+
+      if (error) {
+        console.error('Error descargando:', error);
+        setSyncStatus('error', 'Error de sincronización');
+        return;
+      }
+
+      if (!data) {
+        await syncToCloud();
+        return;
+      }
+
+      config = data.config && Object.keys(data.config).length ? { ...defaultConfig, ...data.config } : { ...defaultConfig };
+      trips = Array.isArray(data.trips) ? data.trips : [];
+      daysHistory = Array.isArray(data.days_history) ? data.days_history : [];
+      persistLocal();
+      renderAll();
+      setSyncStatus('synced', 'Sincronizado');
+    }
+
+    async function initializeCloud() {
+      const { data: { session } } = await cloud.auth.getSession();
+      currentUser = session?.user || null;
+      updateAccountUI();
+      if (currentUser) await syncFromCloud();
+
+      cloud.auth.onAuthStateChange(async (event, sessionNow) => {
+        currentUser = sessionNow?.user || null;
+        updateAccountUI();
+        if (event === 'SIGNED_IN' && currentUser) {
+          closeAuthModal();
+          await syncFromCloud();
+        }
+        if (event === 'SIGNED_OUT') renderAll();
+      });
+    }
+
+    function openAuthModal() {
+      document.getElementById('authModal').classList.remove('hidden');
+      document.getElementById('authModal').classList.add('flex');
+      document.getElementById('authMessage').classList.add('hidden');
+    }
+
+    function closeAuthModal() {
+      document.getElementById('authModal').classList.add('hidden');
+      document.getElementById('authModal').classList.remove('flex');
+    }
+
+    function showAuthMessage(message, ok = false) {
+      const el = document.getElementById('authMessage');
+      el.className = `text-xs rounded-lg p-3 ${ok ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border border-red-500/30 text-red-300'}`;
+      el.textContent = message;
+    }
+
+    async function signIn() {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+      if (!email || !password) return showAuthMessage('Escribe tu correo y contraseña.');
+      setAuthButtons(true);
+      const { error } = await cloud.auth.signInWithPassword({ email, password });
+      setAuthButtons(false);
+      if (error) showAuthMessage(error.message === 'Invalid login credentials' ? 'Correo o contraseña incorrectos.' : error.message);
+    }
+
+    async function signUp() {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+      if (!email || password.length < 6) return showAuthMessage('Usa un correo válido y una contraseña de mínimo 6 caracteres.');
+      setAuthButtons(true);
+      const redirectTo = window.location.origin + window.location.pathname;
+      const { data, error } = await cloud.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
+      setAuthButtons(false);
+      if (error) return showAuthMessage(error.message);
+      if (data.session) {
+        showAuthMessage('Cuenta creada. Sincronizando tus datos...', true);
+      } else {
+        showAuthMessage('Cuenta creada. Revisa tu correo y confirma la cuenta; luego vuelve aquí y pulsa Entrar.', true);
+      }
+    }
+
+    function setAuthButtons(disabled) {
+      document.getElementById('loginBtn').disabled = disabled;
+      document.getElementById('signupBtn').disabled = disabled;
+      document.getElementById('loginBtn').classList.toggle('opacity-50', disabled);
+      document.getElementById('signupBtn').classList.toggle('opacity-50', disabled);
+    }
+
+    async function signOut() {
+      await cloud.auth.signOut();
+      currentUser = null;
+      updateAccountUI();
+    }
+
+    function formatCOP(val) { return '$' + Math.round(val).toLocaleString('es-CO'); }
+    function getFuelCostPerKm() { return config.gasPriceGal / (config.kmPerLiter * 3.78541); }
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
     }
 
     function toggleConfig() {
@@ -309,83 +326,63 @@
       }
     }
 
-    function saveConfig() {
+    async function saveConfig() {
       config.dailyGoal = parseFloat(document.getElementById('cfgGoal').value) || 100000;
       config.gasPriceGal = parseFloat(document.getElementById('cfgGasPrice').value) || 16350;
       config.kmPerLiter = parseFloat(document.getElementById('cfgKmPerLiter').value) || 27.0;
       config.maintPerKm = parseFloat(document.getElementById('cfgMaintKm').value) || 136.91;
       config.fixedDailyCost = parseFloat(document.getElementById('cfgFixedCost').value) || 3000;
       config.goalMode = document.getElementById('cfgMode').value;
-
-      localStorage.setItem('alpina_config', JSON.stringify(config));
+      persistLocal();
       toggleConfig();
       renderAll();
+      await syncToCloud();
     }
 
     function calculateDayTotals() {
       const fuelPerKm = getFuelCostPerKm();
-      let totalKm = 0;
-      let totalAppReceived = 0;
-      let totalFuel = 0;
-      let totalMaint = 0;
-
+      let totalKm = 0, totalAppReceived = 0, totalFuel = 0, totalMaint = 0;
       trips.forEach(t => {
-        const km = t.tripKm + t.deadheadKm;
+        const km = Number(t.tripKm || 0) + Number(t.deadheadKm || 0);
         totalKm += km;
-        totalAppReceived += t.netFare;
+        totalAppReceived += Number(t.netFare || 0);
         totalFuel += km * fuelPerKm;
         totalMaint += km * config.maintPerKm;
       });
-
       const fixed = trips.length > 0 ? config.fixedDailyCost : 0;
-      const cashInHand = totalAppReceived - totalFuel - fixed;
-      const realNet = totalAppReceived - totalFuel - totalMaint - fixed;
-
-      return { totalKm, totalAppReceived, totalFuel, totalMaint, cashInHand, realNet, fuelPerKm };
+      return { totalKm, totalAppReceived, totalFuel, totalMaint, cashInHand: totalAppReceived - totalFuel - fixed, realNet: totalAppReceived - totalFuel - totalMaint - fixed, fuelPerKm };
     }
 
-    function handleTripSubmit(e) {
+    async function handleTripSubmit(e) {
       e.preventDefault();
       const editId = document.getElementById('editTripId').value;
       const netFare = parseFloat(document.getElementById('inputNetFare').value) || 0;
       const tripKm = parseFloat(document.getElementById('inputTripKm').value) || 0;
       const deadheadKm = parseFloat(document.getElementById('inputDeadheadKm').value) || 0;
       const note = document.getElementById('inputNote').value.trim() || 'Viaje Uber Moto';
-
       if (editId) {
         const idx = trips.findIndex(t => t.id === editId);
-        if (idx !== -1) {
-          trips[idx] = { ...trips[idx], netFare, tripKm, deadheadKm, note };
-        }
+        if (idx !== -1) trips[idx] = { ...trips[idx], netFare, tripKm, deadheadKm, note };
         cancelEdit();
       } else {
-        trips.push({
-          id: Date.now().toString(),
-          time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
-          netFare,
-          tripKm,
-          deadheadKm,
-          note
-        });
+        trips.push({ id: Date.now().toString(), time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }), netFare, tripKm, deadheadKm, note });
       }
-
-      localStorage.setItem('alpina_trips', JSON.stringify(trips));
+      persistLocal();
       document.getElementById('inputNetFare').value = '';
       document.getElementById('inputTripKm').value = '';
       document.getElementById('inputDeadheadKm').value = '1.8';
       document.getElementById('inputNote').value = '';
       renderAll();
+      await syncToCloud();
     }
 
     function editTrip(id) {
-      const t = trips.find(x => x.id === id);
-      if (!t) return;
+      const t = trips.find(x => x.id === id); if (!t) return;
       document.getElementById('editTripId').value = t.id;
       document.getElementById('inputNetFare').value = t.netFare;
       document.getElementById('inputTripKm').value = t.tripKm;
       document.getElementById('inputDeadheadKm').value = t.deadheadKm;
       document.getElementById('inputNote').value = t.note;
-
       document.getElementById('formTitle').textContent = '✏️ Corrigiendo Registro Seleccionado';
       document.getElementById('editBadge').classList.remove('hidden');
       document.getElementById('cancelEditBtn').classList.remove('hidden');
@@ -399,18 +396,18 @@
       document.getElementById('inputTripKm').value = '';
       document.getElementById('inputDeadheadKm').value = '1.8';
       document.getElementById('inputNote').value = '';
-
       document.getElementById('formTitle').textContent = '➕ Registrar Nuevo Viaje o Bono';
       document.getElementById('editBadge').classList.add('hidden');
       document.getElementById('cancelEditBtn').classList.add('hidden');
       document.getElementById('submitBtn').textContent = 'Guardar Registro';
     }
 
-    function deleteTrip(id) {
+    async function deleteTrip(id) {
       trips = trips.filter(t => t.id !== id);
-      localStorage.setItem('alpina_trips', JSON.stringify(trips));
+      persistLocal();
       if (document.getElementById('editTripId').value === id) cancelEdit();
       renderAll();
+      await syncToCloud();
     }
 
     function openEndDayModal() {
@@ -421,69 +418,44 @@
       document.getElementById('endDayModal').classList.remove('hidden');
       document.getElementById('endDayModal').classList.add('flex');
     }
+    function closeEndDayModal() { document.getElementById('endDayModal').classList.add('hidden'); document.getElementById('endDayModal').classList.remove('flex'); }
 
-    function closeEndDayModal() {
-      document.getElementById('endDayModal').classList.add('hidden');
-      document.getElementById('endDayModal').classList.remove('flex');
-    }
-
-    function confirmEndDay() {
+    async function confirmEndDay() {
       const totals = calculateDayTotals();
       if (trips.length > 0) {
-        daysHistory.unshift({
-          date: new Date().toLocaleDateString('es-CO'),
-          tripsCount: trips.length,
-          totalKm: totals.totalKm,
-          realNet: totals.realNet,
-          cashInHand: totals.cashInHand,
-          fuel: totals.totalFuel,
-          maint: totals.totalMaint
-        });
-        localStorage.setItem('alpina_history', JSON.stringify(daysHistory));
+        daysHistory.unshift({ date: new Date().toLocaleDateString('es-CO'), tripsCount: trips.length, totalKm: totals.totalKm, realNet: totals.realNet, cashInHand: totals.cashInHand, fuel: totals.totalFuel, maint: totals.totalMaint });
       }
       trips = [];
-      localStorage.setItem('alpina_trips', JSON.stringify(trips));
+      persistLocal();
       closeEndDayModal();
       renderAll();
+      await syncToCloud();
     }
 
-    function clearHistory() {
+    async function clearHistory() {
+      if (!confirm('¿Seguro que quieres borrar todo el historial de días cerrados?')) return;
       daysHistory = [];
-      localStorage.setItem('alpina_history', JSON.stringify(daysHistory));
+      persistLocal();
       renderAll();
+      await syncToCloud();
     }
 
     function renderAll() {
       const totals = calculateDayTotals();
       const activeMetric = config.goalMode === 'real' ? totals.realNet : totals.cashInHand;
       const pct = Math.max(0, Math.min(100, (activeMetric / config.dailyGoal) * 100));
-
-      // Actualizar Medidor Circular y Lineal
       const circumference = 314.16;
-      const offset = circumference - (pct / 100) * circumference;
-      document.getElementById('gaugeBar').style.strokeDashoffset = offset;
+      document.getElementById('gaugeBar').style.strokeDashoffset = circumference - (pct / 100) * circumference;
       document.getElementById('gaugePct').textContent = `${Math.round(pct)}%`;
       document.getElementById('linearProgressBar').style.width = `${pct}%`;
-
-      document.getElementById('modeLabel').textContent = config.goalMode === 'real'
-        ? 'Utilidad Neta Real Acumulada (Libre de todo)'
-        : 'Flujo de Caja Acumulado (Bolsillo Hoy)';
-
+      document.getElementById('modeLabel').textContent = config.goalMode === 'real' ? 'Utilidad Neta Real Acumulada (Libre de todo)' : 'Flujo de Caja Acumulado (Bolsillo Hoy)';
       document.getElementById('currentNetDisplay').textContent = `${formatCOP(activeMetric)} COP`;
       document.getElementById('goalDisplay').textContent = `${formatCOP(config.dailyGoal)} COP`;
-
       const remaining = Math.max(0, config.dailyGoal - activeMetric);
-      const avgNetPerTrip = trips.length > 0 && activeMetric > 0 ? (activeMetric / trips.length) : 4059;
+      const avgNetPerTrip = trips.length > 0 && activeMetric > 0 ? activeMetric / trips.length : 4059;
       const estTrips = remaining > 0 ? Math.ceil(remaining / Math.max(2500, avgNetPerTrip)) : 0;
-
-      document.getElementById('remainingText').innerHTML = remaining > 0
-        ? `Faltan: <b class="text-white">${formatCOP(remaining)} COP</b>`
-        : `<b class="text-emerald-400">¡Meta diaria cumplida! 🎉</b>`;
-      document.getElementById('estTripsLeft').textContent = remaining > 0
-        ? `~${estTrips} viajes promedio restantes`
-        : `0 viajes restantes`;
-
-      // KPIs
+      document.getElementById('remainingText').innerHTML = remaining > 0 ? `Faltan: <b class="text-white">${formatCOP(remaining)} COP</b>` : `<b class="text-emerald-400">¡Meta diaria cumplida! 🎉</b>`;
+      document.getElementById('estTripsLeft').textContent = remaining > 0 ? `~${estTrips} viajes promedio restantes` : '0 viajes restantes';
       document.getElementById('kpiDistance').textContent = `${totals.totalKm.toFixed(1).replace('.', ',')} km`;
       document.getElementById('kpiTripsCount').textContent = `${trips.length} registros hoy`;
       document.getElementById('kpiCashInHand').textContent = formatCOP(totals.cashInHand);
@@ -492,58 +464,25 @@
       document.getElementById('kpiMaintCost').textContent = formatCOP(totals.totalMaint);
       document.getElementById('kpiMaintKmCost').textContent = `${formatCOP(config.maintPerKm)} COP/km`;
 
-      // Tabla de viajes
       const tbody = document.getElementById('tripsTableBody');
-      if (trips.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-500">Aún no has registrado viajes en este turno.</td></tr>`;
-      } else {
-        tbody.innerHTML = trips.map((t, index) => {
-          const km = t.tripKm + t.deadheadKm;
-          const fuel = km * totals.fuelPerKm;
-          const maint = km * config.maintPerKm;
-          const realProfit = t.netFare - fuel - maint;
-          return `
-            <tr class="hover:bg-slate-800/40">
-              <td class="py-2.5 px-2 font-medium text-slate-400">${index + 1}</td>
-              <td class="py-2.5 px-2">
-                <span class="font-medium text-white block">${t.note}</span>
-                <span class="text-[10px] text-slate-400">${t.time} · (${t.tripKm}km + ${t.deadheadKm}km vacío)</span>
-              </td>
-              <td class="py-2.5 px-2">${km.toFixed(1)} km</td>
-              <td class="py-2.5 px-2 text-cyan-300 font-medium">${formatCOP(t.netFare)}</td>
-              <td class="py-2.5 px-2 text-amber-300">-${formatCOP(fuel)}</td>
-              <td class="py-2.5 px-2 font-bold text-emerald-400">${formatCOP(realProfit)}</td>
-              <td class="py-2.5 px-2 text-right space-x-1">
-                <button onclick="editTrip('${t.id}')" class="px-2 py-1 bg-slate-700 hover:bg-amber-600 text-white rounded text-[11px]">Corregir</button>
-                <button onclick="deleteTrip('${t.id}')" class="px-2 py-1 bg-slate-700 hover:bg-red-600 text-white rounded text-[11px]">✕</button>
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
+      if (!trips.length) tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-500">Aún no has registrado viajes en este turno.</td></tr>`;
+      else tbody.innerHTML = trips.map((t, index) => {
+        const tripKm = Number(t.tripKm || 0), deadheadKm = Number(t.deadheadKm || 0), km = tripKm + deadheadKm;
+        const fuel = km * totals.fuelPerKm, maint = km * config.maintPerKm, realProfit = Number(t.netFare || 0) - fuel - maint;
+        return `<tr class="hover:bg-slate-800/40"><td class="py-2.5 px-2 font-medium text-slate-400">${index + 1}</td><td class="py-2.5 px-2"><span class="font-medium text-white block">${escapeHtml(t.note)}</span><span class="text-[10px] text-slate-400">${escapeHtml(t.time)} · (${tripKm}km + ${deadheadKm}km vacío)</span></td><td class="py-2.5 px-2">${km.toFixed(1)} km</td><td class="py-2.5 px-2 text-cyan-300 font-medium">${formatCOP(t.netFare)}</td><td class="py-2.5 px-2 text-amber-300">-${formatCOP(fuel)}</td><td class="py-2.5 px-2 font-bold text-emerald-400">${formatCOP(realProfit)}</td><td class="py-2.5 px-2 text-right space-x-1"><button onclick="editTrip('${t.id}')" class="px-2 py-1 bg-slate-700 hover:bg-amber-600 text-white rounded text-[11px]">Corregir</button><button onclick="deleteTrip('${t.id}')" class="px-2 py-1 bg-slate-700 hover:bg-red-600 text-white rounded text-[11px]">✕</button></td></tr>`;
+      }).join('');
 
-      // Historial de cierres
       const histDiv = document.getElementById('daysHistoryContainer');
-      if (daysHistory.length === 0) {
-        histDiv.innerHTML = `<p class="text-slate-500">No hay días cerrados registrados todavía.</p>`;
-      } else {
-        histDiv.innerHTML = daysHistory.map(d => `
-          <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-wrap justify-between items-center gap-2">
-            <div>
-              <span class="font-bold text-white">${d.date}</span>
-              <span class="text-slate-400 ml-2">(${d.tripsCount} viajes · ${d.totalKm.toFixed(1)} km)</span>
-            </div>
-            <div class="flex gap-4">
-              <span>Gasolina: <b class="text-amber-400">${formatCOP(d.fuel)}</b></span>
-              <span>Reserva: <b class="text-purple-400">${formatCOP(d.maint)}</b></span>
-              <span>Libre Real: <b class="text-emerald-400">${formatCOP(d.realNet)}</b></span>
-            </div>
-          </div>
-        `).join('');
-      }
+      if (!daysHistory.length) histDiv.innerHTML = `<p class="text-slate-500">No hay días cerrados registrados todavía.</p>`;
+      else histDiv.innerHTML = daysHistory.map(d => `<div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-wrap justify-between items-center gap-2"><div><span class="font-bold text-white">${escapeHtml(d.date)}</span><span class="text-slate-400 ml-2">(${Number(d.tripsCount || 0)} viajes · ${Number(d.totalKm || 0).toFixed(1)} km)</span></div><div class="flex gap-4"><span>Gasolina: <b class="text-amber-400">${formatCOP(d.fuel)}</b></span><span>Reserva: <b class="text-purple-400">${formatCOP(d.maint)}</b></span><span>Libre Real: <b class="text-emerald-400">${formatCOP(d.realNet)}</b></span></div></div>`).join('');
     }
 
+    window.addEventListener('focus', () => { if (currentUser) syncFromCloud(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && currentUser) syncFromCloud(); });
+
+    persistLocal();
     renderAll();
+    initializeCloud();
   </script>
 </body>
 </html>
